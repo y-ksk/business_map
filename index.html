@@ -3,50 +3,45 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>シナジーマップ（俯瞰＋ズーム&ドラッグ対応）</title>
+    <title>シナジーマップ（俯瞰＋ズーム&ドラッグ対応・安全版）</title>
 
-    <!-- Tailwind CSS（CDN; クラスで見た目を整えるだけなのでOK）-->
+    <!-- 見た目用：Tailwind（CDN） -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- React + ReactDOM（CDN; ブラウザでそのまま動かす）-->
+    <!-- React + ReactDOM（CDN） -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 
-    <!-- react-zoom-pan-pinch（ズーム＆ドラッグ用のライブラリ; UMD版）-->
-    <script src="https://unpkg.com/react-zoom-pan-pinch/dist/index.umd.js"></script>
-
-    <!-- Babel（JSXをブラウザ側で解釈するため）-->
+    <!-- JSXをブラウザで解釈するためのBabel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
       html, body, #root { height: 100%; }
-      /* Notion埋め込みで小さくならないよう最小高さを確保 */
-      body { min-height: 90vh; }
+      body { background: #f1f5f9; } /* slate-100 */
+      /* Notion埋め込み対策：埋め込み枠が小さくても操作しやすいよう確保 */
+      .viewport { height: 92vh; }
+      /* テキスト選択でドラッグが途切れないように */
+      .no-select { user-select: none; -webkit-user-select: none; }
     </style>
   </head>
-
-  <body class="bg-slate-100">
+  <body>
     <div id="root"></div>
 
-    <!-- アプリ本体 -->
     <script type="text/babel">
       const { useEffect, useRef, useState } = React;
-      // UMDグローバルからコンポーネントを取り出す（CDN一発でOK）
-      const { TransformWrapper, TransformComponent } =
-        window.ReactZoomPanPinch || window["react-zoom-pan-pinch"] || {};
 
       /* ========== 小ユーティリティ ========== */
       const cx = (...cls) => cls.filter(Boolean).join(" ");
 
       /* ========== グリッド（重なり防止の俯瞰配置） ========== */
-      const GRID = { COLS: 5, ROWS: 7, MARGIN: 3 }; // % 余白
+      const GRID = { COLS: 5, ROWS: 7, MARGIN: 3 }; // %余白
       const gridToPercent = (col, row) => {
         const left = GRID.MARGIN + (col * (100 - GRID.MARGIN * 2)) / (GRID.COLS - 1);
         const top  = GRID.MARGIN + (row * (100 - GRID.MARGIN * 2)) / (GRID.ROWS - 1);
         return { left, top };
       };
 
-      /* ========== ノード定義 ========== */
+      /* ========== データ ========== */
       const nodes = [
         { id: "core", title: "中核コンテンツ", subtitle: "『カルチャーフィットを科学する』世界観",
           points: ["価値観のミスマッチをなくす","採用＝カルチャー×スキルの適合","現場データ×AIで意思決定を客観化"],
@@ -74,7 +69,6 @@
           grid: { col: 4, row: 5 }, tone: "amber" },
       ];
 
-      /* ========== エッジ定義 ========== */
       const edges = [
         { from: "entry", to: "p1", label: "見込み→伴走", tone: "emerald" },
         { from: "p1", to: "datalake", label: "現場データ蓄積", tone: "cyan" },
@@ -103,7 +97,7 @@
         slate: "#94a3b8", violet: "#a78bfa", amber: "#f59e0b", rose: "#fb7185",
       };
 
-      /* ========== レイアウト計測（矢印用） ========== */
+      /* ========== 矢印のためのノード位置測定 ========== */
       function useNodePositions(containerRef) {
         const refs = React.useRef({});
         const [centers, setCenters] = useState({});
@@ -128,7 +122,7 @@
         return { refs, centers };
       }
 
-      /* ========== 補助UI：縦バンド（列の意味を表示） ========== */
+      /* ========== 補助UI：列の意味を薄い帯で表示 ========== */
       function ColumnBands() {
         const labels = ["入口/世界観","Phase 1","データ基盤","Phase 2 / 3","ブランド/コミュニティ"];
         return (
@@ -203,10 +197,9 @@
               const k = 0.08;
               const c1 = { x: a.x + dx*0.25 + (normal.x/len)*k*220, y: a.y + dy*0.25 + (normal.y/len)*k*220 };
               const c2 = { x: a.x + dx*0.75 + (normal.x/len)*k*220, y: a.y + dy*0.75 + (normal.y/len)*k*220 };
-              const stroke = toneToStroke[e.tone] || "#94a3b8";
               return (
                 <g key={i}>
-                  <path d={`M ${a.x},${a.y} C ${c1.x},${c1.y} ${c2.x},${c2.y} ${b.x},${b.y}`} fill="none" stroke={stroke} strokeWidth={3} markerEnd={`url(#arrow-${e.tone})`} opacity={0.95} />
+                  <path d={`M ${a.x},${a.y} C ${c1.x},${c1.y} ${c2.x},${c2.y} ${b.x},${b.y}`} fill="none" stroke={toneToStroke[e.tone] || "#94a3b8"} strokeWidth={3} markerEnd={`url(#arrow-${e.tone})`} opacity={0.95} />
                   <foreignObject x={m.x - 90} y={m.y - 14} width={180} height={28}>
                     <div className="text-[10px] text-center bg-white/90 px-1 rounded-full border border-black/5">{e.label}</div>
                   </foreignObject>
@@ -217,13 +210,76 @@
         );
       }
 
-      /* ========== 左パネル（折りたたみ可能） ========== */
+      /* ========== 自前Pan/Zoomコンテナ（ホイール＆ドラッグ） ========== */
+      function PanZoom({ children }) {
+        const viewportRef = useRef(null);
+        const contentRef = useRef(null);
+        const [state, setState] = useState({ scale: 0.8, x: 0, y: 0, dragging: false, px: 0, py: 0 });
+        const min = 0.4, max = 2.5;
+
+        // ホイールでズーム（カーソル位置に寄せる）
+        useEffect(() => {
+          const el = viewportRef.current;
+          function onWheel(e) {
+            e.preventDefault();
+            const rect = el.getBoundingClientRect();
+            const cx = e.clientX - rect.left - state.x;
+            const cy = e.clientY - rect.top - state.y;
+            const delta = - (e.deltaY || e.wheelDelta) / 500; // ズーム量
+            let ns = Math.min(max, Math.max(min, state.scale * (1 + delta)));
+            const k = ns / state.scale;
+            // ズーム中心を維持するようオフセットを調整
+            const nx = state.x - (cx * (k - 1));
+            const ny = state.y - (cy * (k - 1));
+            setState(s => ({ ...s, scale: ns, x: nx, y: ny }));
+          }
+          el.addEventListener("wheel", onWheel, { passive: false });
+          return () => el.removeEventListener("wheel", onWheel);
+        }, [state.scale, state.x, state.y]);
+
+        // ドラッグで移動
+        function onMouseDown(e) { setState(s => ({ ...s, dragging: true, px: e.clientX, py: e.clientY })); }
+        function onMouseMove(e) {
+          if (!state.dragging) return;
+          const dx = e.clientX - state.px;
+          const dy = e.clientY - state.py;
+          setState(s => ({ ...s, x: s.x + dx, y: s.y + dy, px: e.clientX, py: e.clientY }));
+        }
+        function onMouseUp() { setState(s => ({ ...s, dragging: false })); }
+
+        return (
+          <div
+            ref={viewportRef}
+            className="viewport relative overflow-hidden bg-white rounded-2xl border shadow-sm no-select"
+            onMouseDown={onMouseDown}
+            onMouseMove={onMouseMove}
+            onMouseLeave={onMouseUp}
+            onMouseUp={onMouseUp}
+          >
+            <div
+              ref={contentRef}
+              className="absolute"
+              style={{
+                width: "2000px",
+                height: "1100px",
+                transform: `translate(${state.x}px, ${state.y}px) scale(${state.scale})`,
+                transformOrigin: "0 0"
+              }}
+            >
+              {children}
+            </div>
+            <div className="absolute left-3 top-3 text-xs px-2 py-1 rounded-md bg-white/90 border shadow">ホイールでズーム / ドラッグで移動</div>
+          </div>
+        );
+      }
+
+      /* ========== 左パネル（任意表示） ========== */
       function SidePanel() {
         return (
           <div className="p-4 md:p-6 lg:p-8 h-full overflow-auto">
             <h1 className="text-2xl font-bold">採用3段階戦略のシナジーマップ（俯瞰）</h1>
             <p className="mt-2 text-sm leading-relaxed opacity-80">
-              重なりをなくすために5カラム×7行の格子に固定。左→右で「入口→Phase1→データ基盤→Phase2/3→ブランド/コミュニティ」を追えます。
+              5カラム×7行の格子に固定。左→右で「入口→Phase1→データ基盤→Phase2/3→ブランド/コミュニティ」を追えます。
             </p>
             <div className="mt-3 text-xs bg-slate-50 border rounded-xl p-3">
               <div className="font-semibold mb-1">読み方のコツ</div>
@@ -241,53 +297,35 @@
       function App() {
         const containerRef = useRef(null);
         const { refs, centers } = useNodePositions(containerRef);
-        const [showPanel, setShowPanel] = useState(false); // 左パネル既定オフ（全体を広く見せる）
+        const [showPanel, setShowPanel] = useState(false); // 既定オフで広く表示
 
         return (
           <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-50">
-            <div className={cx(
-              "grid h-[92vh] gap-4 p-4",
-              showPanel ? "grid-cols-1 lg:grid-cols-[1.1fr_1.8fr]" : "grid-cols-1"
-            )}>
+            <div className={cx("grid gap-4 p-4", showPanel ? "grid-cols-1 lg:grid-cols-[1.1fr_1.8fr]" : "grid-cols-1")}>
               {showPanel && (
                 <aside className="rounded-2xl bg-white shadow-sm border overflow-hidden">
                   <SidePanel />
                 </aside>
               )}
 
-              <section className="relative rounded-2xl bg-white shadow-sm border overflow-hidden">
-                {/* ズーム＆ドラッグを提供するラッパー（ここが今回の肝） */}
-                <TransformWrapper
-                  initialScale={0.8}
-                  minScale={0.4}
-                  maxScale={2.5}
-                  wheel={{ step: 0.05 }}
-                  doubleClick={{ disabled: true }}
-                >
-                  <TransformComponent>
-                    <div className="relative" style={{ width: "2000px", height: "1100px" }}>
-                      {/* Note: 固定サイズにしておくと、Notionの小さな埋め込みでも全体をズームアウトで俯瞰しやすい */}
-                      <div className="absolute inset-0" ref={containerRef}>
-                        <ColumnBands />
-                        <ArrowLayer centers={centers} />
-                        {nodes.map((n) => <NodeCard key={n.id} n={n} register={refs} />)}
-                        <div className="absolute left-4 top-4 text-xs px-2 py-1 bg-black/80 text-white rounded-md shadow">
-                          HR版・循環する事業生態系（俯瞰レイアウト）
-                        </div>
-                      </div>
-                    </div>
-                  </TransformComponent>
-                </TransformWrapper>
+              <PanZoom>
+                <div className="absolute inset-0" ref={containerRef}>
+                  <ColumnBands />
+                  <ArrowLayer centers={centers} />
+                  {nodes.map((n) => <NodeCard key={n.id} n={n} register={refs} />)}
+                  <div className="absolute left-4 top-4 text-xs px-2 py-1 bg-black/80 text-white rounded-md shadow">
+                    HR版・循環する事業生態系（俯瞰レイアウト）
+                  </div>
+                </div>
+              </PanZoom>
 
-                {/* 左パネルの表示/非表示トグル（画面左上に固定） */}
-                <button
-                  onClick={() => setShowPanel(v => !v)}
-                  className="absolute z-10 left-3 top-3 text-xs px-2 py-1 rounded-md bg-white/90 border shadow hover:bg-white"
-                  title={showPanel ? "説明を隠す" : "説明を表示"}
-                >
-                  {showPanel ? "説明を隠す" : "説明を表示"}
-                </button>
-              </section>
+              <button
+                onClick={() => setShowPanel(v => !v)}
+                className="fixed z-10 left-3 bottom-3 text-xs px-3 py-1.5 rounded-md bg-white/90 border shadow hover:bg-white"
+                title={showPanel ? "説明を隠す" : "説明を表示"}
+              >
+                {showPanel ? "説明を隠す" : "説明を表示"}
+              </button>
             </div>
           </div>
         );
