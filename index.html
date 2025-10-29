@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>シナジーマップ（俯瞰レイアウト版）</title>
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React + ReactDOM (CDN) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel (to allow JSX directly in the browser) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      html, body, #root { height: 100%; }
+    </style>
+  </head>
+  <body class="min-h-screen bg-slate-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useEffect, useRef, useState } = React;
+
+      // ===== ユーティリティ =====
+      function cx(...cls) { return cls.filter(Boolean).join(" "); }
+
+      // ===== レイアウト方針 =====
+      const GRID = { COLS: 5, ROWS: 7, MARGIN: 3 }; // %の余白
+      function gridToPercent(col, row) {
+        const left = GRID.MARGIN + (col * (100 - GRID.MARGIN * 2)) / (GRID.COLS - 1);
+        const top  = GRID.MARGIN + (row * (100 - GRID.MARGIN * 2)) / (GRID.ROWS - 1);
+        return { left, top };
+      }
+
+      // ===== ノード定義（重なりのない格子座標） =====
+      const nodes = [
+        {
+          id: "core",
+          title: "中核コンテンツ",
+          subtitle: "『カルチャーフィットを科学する』世界観",
+          points: [
+            "価値観のミスマッチをなくす",
+            "採用＝カルチャー×スキルの適合",
+            "現場データ×AIで意思決定を客観化",
+          ],
+          grid: { col: 0, row: 0 }, tone: "indigo",
+        },
+        {
+          id: "entry",
+          title: "入口（フロント）",
+          subtitle: "無料/低単価で世界観に触れる接点",
+          points: [
+            "ブログ/Voicy/登壇/ケース公開",
+            "無料『採用診断ライト』",
+            "スカウト文テンプレ配布",
+          ],
+          grid: { col: 0, row: 3 }, tone: "emerald",
+        },
+        {
+          id: "p1",
+          title: "Phase 1: 採用コミットジム",
+          subtitle: "伴走コンサル（月額リテイナー）",
+          points: [
+            "採用戦略/面接官トレ/広報の内製化",
+            "キャッシュ創出（初期投資ほぼゼロ）",
+            "真の課題/成功パターンの一次データ",
+          ],
+          grid: { col: 1, row: 3 }, tone: "cyan",
+        },
+        {
+          id: "datalake",
+          title: "データ基盤（行動×成功データ）",
+          subtitle: "勝ち筋の学習・評価",
+          points: [
+            "求人要件×スカウト文×返信率",
+            "候補者属性×選考通過率",
+            "価値観指標×オンボ成功/離職",
+          ],
+          grid: { col: 2, row: 3 }, tone: "slate",
+        },
+        {
+          id: "p2",
+          title: "Phase 2: AI Scout Analyst",
+          subtitle: "スカウト文自動生成SaaS",
+          points: [
+            "1通30分→3分",
+            "品質の標準化とABテスト",
+            "MRR拡大＆スケール",
+          ],
+          grid: { col: 3, row: 1 }, tone: "sky",
+        },
+        {
+          id: "p3",
+          title: "Phase 3: Culture Fit AI",
+          subtitle: "価値観×文化の適合を測る診断",
+          points: [
+            "企業の生きた文化を言語化/可視化",
+            "候補者の価値観/潜在特性の測定",
+            "適合度スコア→配属/定着に活用",
+          ],
+          grid: { col: 3, row: 5 }, tone: "violet",
+        },
+        {
+          id: "brand",
+          title: "雇用主ブランディング",
+          subtitle: "語れる組織の物語/原体験の蓄積",
+          points: [
+            "採用広報資産（動画/記事/ノウハウ）",
+            "カルチャーデック/バリュー事例",
+            "次の候補者体験の燃料",
+          ],
+          grid: { col: 4, row: 2 }, tone: "rose",
+        },
+        {
+          id: "community",
+          title: "コミュニティ（HRギルド）",
+          subtitle: "卒業企業/採用担当の学習・共創の場",
+          points: [
+            "事例共有と共同検証（RWE:実世界エビデンス）",
+            "プロモーター化（口コミ/紹介/登壇）",
+            "PoC参加・クラファン的支援",
+          ],
+          grid: { col: 4, row: 5 }, tone: "amber",
+        },
+      ];
+
+      // ===== 矢印定義（from->to, ラベル, 色） =====
+      const edges = [
+        { from: "entry", to: "p1", label: "見込み→伴走", tone: "emerald" },
+        { from: "p1", to: "datalake", label: "現場データ蓄積", tone: "cyan" },
+        { from: "datalake", to: "p2", label: "学習→自動化", tone: "slate" },
+        { from: "p2", to: "datalake", label: "AB結果/返信率フィードバック", tone: "sky" },
+        { from: "datalake", to: "p3", label: "価値観モデルの精緻化", tone: "slate" },
+        { from: "p3", to: "brand", label: "適合度の成功体験→物語化", tone: "violet" },
+        { from: "brand", to: "entry", label: "物語が入口を拡張", tone: "rose" },
+        { from: "p1", to: "community", label: "卒業/仲間化", tone: "cyan" },
+        { from: "p2", to: "community", label: "ユーザー会/改善共創", tone: "sky" },
+        { from: "p3", to: "community", label: "価値観診断の普及/検証", tone: "violet" },
+        { from: "community", to: "entry", label: "口コミ/登壇/紹介", tone: "amber" },
+        { from: "community", to: "datalake", label: "事例/失敗もデータ化", tone: "amber" },
+        { from: "core", to: "entry", label: "思想の翻訳/発信", tone: "indigo" },
+        { from: "core", to: "p1", label: "支援方針/型化の指針", tone: "indigo" },
+        { from: "core", to: "p3", label: "価値観モデルの要件定義", tone: "indigo" },
+      ];
+
+      const toneToRing = {
+        indigo: "ring-indigo-400",
+        emerald: "ring-emerald-400",
+        cyan: "ring-cyan-400",
+        sky: "ring-sky-400",
+        slate: "ring-slate-400",
+        violet: "ring-violet-400",
+        amber: "ring-amber-400",
+        rose: "ring-rose-400",
+      };
+      const toneToStroke = {
+        indigo: "#818cf8",
+        emerald: "#34d399",
+        cyan: "#22d3ee",
+        sky: "#38bdf8",
+        slate: "#94a3b8",
+        violet: "#a78bfa",
+        amber: "#f59e0b",
+        rose: "#fb7185",
+      };
+
+      // ===== レイアウト計測 =====
+      function useNodePositions(containerRef) {
+        const refs = React.useRef({});
+        const [centers, setCenters] = useState({});
+        React.useEffect(() => {
+          function calc() {
+            const c = containerRef.current; if (!c) return;
+            const crect = c.getBoundingClientRect();
+            const next = {};
+            for (const n of nodes) {
+              const el = refs.current[n.id]; if (!el) continue;
+              const r = el.getBoundingClientRect();
+              next[n.id] = { x: r.left - crect.left + r.width / 2, y: r.top - crect.top + r.height / 2 };
+            }
+            setCenters(next);
+          }
+          calc();
+          const ro = new ResizeObserver(calc);
+          if (containerRef.current) ro.observe(containerRef.current);
+          window.addEventListener("resize", calc);
+          return () => { window.removeEventListener("resize", calc); ro.disconnect(); };
+        }, [containerRef]);
+        return { refs, centers };
+      }
+
+      function ColumnBands() {
+        const labels = ["入口/世界観", "Phase 1", "データ基盤", "Phase 2 / 3", "ブランド/コミュニティ"];
+        return (
+          <div className="absolute inset-0 pointer-events-none">
+            {labels.map((label, i) => (
+              <div key={i} className="absolute top-0 bottom-0" style={{
+                left: `${(i * 100) / (GRID.COLS - 1)}%`,
+                width: `${100 / (GRID.COLS - 1)}%`,
+                transform: "translateX(-50%)",
+              }}>
+                <div className={cx("absolute inset-0", i % 2 === 0 ? "bg-slate-50" : "bg-white")} style={{ opacity: 0.6 }} />
+                <div className="absolute left-1/2 -translate-x-1/2 top-2 text-[10px] px-2 py-1 bg-black/70 text-white rounded">
+                  {label}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      function NodeCard({ n, register }) {
+        const { left, top } = gridToPercent(n.grid.col, n.grid.row);
+        return (
+          <div
+            ref={(el) => (register.current[n.id] = el)}
+            className={cx(
+              "absolute w-[300px] max-w-[40vw] bg-white/95 backdrop-blur rounded-2xl shadow-lg ring-2",
+              toneToRing[n.tone] || "ring-slate-300"
+            )}
+            style={{ left: `${left}%`, top: `${top}%`, transform: "translate(-50%, -50%)" }}
+          >
+            <div className="p-4">
+              <div className="text-xs tracking-widest opacity-70">{n.subtitle}</div>
+              <div className="text-lg font-bold mt-0.5">{n.title}</div>
+              <ul className="mt-2 space-y-1 text-sm leading-relaxed">
+                {n.points.map((p, i) => (
+                  <li key={i} className="flex gap-2 items-start">
+                    <span className="mt-[6px] inline-block h-[6px] w-[6px] rounded-full bg-black/60" />
+                    <span>{p}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        );
+      }
+
+      function ArrowLayer({ centers }) {
+        const [size, setSize] = useState({ w: 0, h: 0 });
+        const svgRef = useRef(null);
+        useEffect(() => {
+          const el = svgRef.current?.parentElement; if (!el) return;
+          function onResize() { const r = el.getBoundingClientRect(); setSize({ w: r.width, h: r.height }); }
+          onResize();
+          const ro = new ResizeObserver(onResize); ro.observe(el);
+          window.addEventListener("resize", onResize);
+          return () => { window.removeEventListener("resize", onResize); ro.disconnect(); };
+        }, []);
+
+        function mid(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
+
+        return (
+          <svg ref={svgRef} className="absolute inset-0 pointer-events-none" width={size.w} height={size.h}>
+            <defs>
+              {Object.entries(toneToStroke).map(([k, color]) => (
+                <marker key={k} id={`arrow-${k}`} viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill={color} />
+                </marker>
+              ))}
+            </defs>
+            {edges.map((e, i) => {
+              const a = centers[e.from]; const b = centers[e.to]; if (!a || !b) return null;
+              const m = mid(a, b);
+              const dx = b.x - a.x, dy = b.y - a.y;
+              const normal = { x: -dy, y: dx }; const len = Math.hypot(normal.x, normal.y) || 1;
+              const k = 0.08;
+              const c1 = { x: a.x + dx * 0.25 + (normal.x / len) * k * 220, y: a.y + dy * 0.25 + (normal.y / len) * k * 220 };
+              const c2 = { x: a.x + dx * 0.75 + (normal.x / len) * k * 220, y: a.y + dy * 0.75 + (normal.y / len) * k * 220 };
+              const stroke = toneToStroke[e.tone] || "#94a3b8";
+              return (
+                <g key={i}>
+                  <path d={`M ${a.x},${a.y} C ${c1.x},${c1.y} ${c2.x},${c2.y} ${b.x},${b.y}`} fill="none" stroke={stroke} strokeWidth={3} markerEnd={`url(#arrow-${e.tone})`} opacity={0.95} />
+                  <foreignObject x={m.x - 90} y={m.y - 14} width={180} height={28}>
+                    <div className="text-[10px] text-center bg-white/90 px-1 rounded-full border border-black/5">{e.label}</div>
+                  </foreignObject>
+                </g>
+              );
+            })}
+          </svg>
+        );
+      }
+
+      function SidePanel() {
+        return (
+          <div className="p-4 md:p-6 lg:p-8 h-full overflow-auto">
+            <h1 className="text-2xl font-bold">採用3段階戦略のシナジーマップ（俯瞰）</h1>
+            <p className="mt-2 text-sm leading-relaxed opacity-80">
+              重なりをなくすために5カラム×7行の格子に固定。左から右へ進むだけで「入口→Phase1→データ基盤→Phase2/3→ブランド/コミュニティ」の循環が一目で追えます。
+            </p>
+            <div className="mt-3 text-xs bg-slate-50 border rounded-xl p-3">
+              <div className="font-semibold mb-1">読み方のコツ</div>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>縦は重要度/時間軸の微調整、横は流れの大筋（左→右）</li>
+                <li>中央の「データ基盤」がハブ。上下（Phase2/3）と右端（ブランド/コミュニティ）へ循環</li>
+                <li>各色の矢印ラベルで関係性が即時把握できるよう簡潔化</li>
+              </ul>
+            </div>
+          </div>
+        );
+      }
+
+      function SynergyMapBirdsEye() {
+        const containerRef = useRef(null);
+        const { refs, centers } = useNodePositions(containerRef);
+        return (
+          <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-50">
+            <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1.8fr] h-[90vh] gap-4 p-4">
+              <aside className="rounded-2xl bg-white shadow-sm border overflow-hidden">
+                <SidePanel />
+              </aside>
+              <section className="relative rounded-2xl bg-white shadow-sm border overflow-hidden">
+                <ColumnBands />
+                <div className="absolute inset-0" ref={containerRef}>
+                  <ArrowLayer centers={centers} />
+                  {nodes.map((n) => (
+                    <NodeCard key={n.id} n={n} register={refs} />
+                  ))}
+                  <div className="absolute left-4 top-4 text-xs px-2 py-1 bg-black/80 text-white rounded-md shadow">
+                    HR版・循環する事業生態系（俯瞰レイアウト）
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<SynergyMapBirdsEye />);
+    </script>
+  </body>
+</html>
